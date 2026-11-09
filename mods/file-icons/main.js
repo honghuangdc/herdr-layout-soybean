@@ -5,7 +5,7 @@
 // added DIR, icon() and the Material Icon Theme icons in the rows and the preview header.
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { spaces, panes, focused, exec, watchFolder, theme, settings, window, run, setShared } from "herdr";
+import { spaces, panes, focused, exec, watchFolder, theme, settings, window, run, setShared, layout } from "herdr";
 import ICONS from "./icons.js";
 
 function location() {
@@ -21,6 +21,21 @@ const key = () => JSON.stringify(location());
 const LANG = { ts: "js", tsx: "js", mts: "js", cts: "js", jsx: "js", mjs: "js", toml: "yaml", jsonc: "json", svelte: "html", vue: "html" };
 const PER_FOLDER = 500, TOTAL = 5000;
 const DIR = "mods/file-icons";
+
+// Whether this block is actually on screen: false when its stack shows another
+// child or a column above it is hidden, null when the layout doesn't hold it.
+function shownInLayout(node, visible = true) {
+  if (!node || typeof node !== "object") return null;
+  const here = visible && !node.hidden;
+  if (node.content?.mod === "file-icons") return here;
+  let seen = null;
+  for (const child of node.children || []) {
+    const shown = shownInLayout(child, here && (node.type !== "stack" || !node.active || node.active === child.id));
+    if (shown) return true;
+    if (shown === false) seen = false;
+  }
+  return seen;
+}
 
 // Material Icon Theme's rules, as VS Code applies them: names match case-insensitively; a
 // path rule (".github/workflows") beats a name, a name beats an extension, and the longest
@@ -61,7 +76,8 @@ export default class Files extends View {
   init(_props, cx) {
     this.entries = new Map(); this.folders = new Set(); this.pending = new Set(); this.marks = {};
     this.refresh(cx);
-    cx.timer.every(10000, cx => this.refresh(cx));
+    // Hidden stack children keep their timers: only poll while this block shows.
+    cx.timer.every(30000, cx => { if (shownInLayout(layout()) !== false) this.refresh(cx); });
   }
 
   watch(root, cx) {

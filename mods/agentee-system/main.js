@@ -16,7 +16,7 @@ const HISTORY_LENGTH = 40;
 
 const SYSTEM_DEFAULTS = {
   enabled: true,
-  interval: 2,
+  interval: 10,
   showCpu: true,
   showGpu: true,
   showRam: true,
@@ -190,7 +190,7 @@ export default class SystemMonitor extends View {
     // Hidden copies keep their timers (Herdr keeps a stack's other children
     // alive), so do not spawn probes nobody is looking at.
     if (shownInLayout(layout()) === false) return;
-    const interval = Math.max(1, num(settings.interval) ?? 2) * 1000;
+    const interval = Math.max(1, num(settings.interval) ?? 10) * 1000;
     // The first samples arrive a second apart so CPU/disk/network deltas exist
     // quickly; after that the configured interval decides.
     const wait = this.hasUsage || this.tick > 3 ? interval : 1000;
@@ -297,7 +297,7 @@ export default class SystemMonitor extends View {
       : this.paused
         ? "paused"
         : this.data
-          ? `updated ${clock(this.data.at)} \u00b7 ${Math.max(1, num(settings.interval) ?? 2)}s`
+          ? `updated ${clock(this.data.at)} \u00b7 ${Math.max(1, num(settings.interval) ?? 10)}s`
           : "sampling\u2026";
     return h_flex()
       .flex_none()

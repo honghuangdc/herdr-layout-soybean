@@ -118,7 +118,7 @@ export default class MagpieRouting extends View {
     this.busy = false;
     this.reload(cx);
     // Timers fetch data only; every animation above runs natively.
-    cx.timer.every(1000, (timerCx) => this.reload(timerCx));
+    cx.timer.every(3000, (timerCx) => this.reload(timerCx));
   }
 
   reload(cx) {

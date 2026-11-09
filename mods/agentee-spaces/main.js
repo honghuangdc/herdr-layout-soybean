@@ -30,9 +30,9 @@ const where = (s, ps) => JSON.stringify([s.machine ?? null, place(s, ps)]);
 const base = (path) => path.replace(/\/+$/, "").split("/").pop();
 // Changes made outside Herdr (an editor's save, a commit in another app): looked
 // for this often, in repos the list shows, while the window is in front.
-// Edits don't touch .git, so the watch never sees them: re-read every 15 s
+// Edits don't touch .git, so the watch never sees them: re-read every 30 s
 // (and at once on shared("agentee.git.changed"): an editor save, a git action).
-const FALLBACK = 15000;
+const FALLBACK = 30000;
 
 // What a stored color name looks like on an avatar (the same in every mod
 // that draws space avatars): one strong color per hue, light and dark alike.

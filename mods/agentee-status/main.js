@@ -49,13 +49,13 @@ export default class Status extends View {
     // The open editor file's project root, resolved once per file.
     this.fileRoot = null;
     // A spawn made from render never runs, so the timer does all the looking:
-    // a folder change is read within a second, the same folder every 5 s.
+    // a folder change is read within a second, the same folder every 10 s.
     // shared("agentee.git.changed"): an editor save or a git action, read at once.
     cx.timer.every(1000, (cx) => {
       const changed = shared("agentee.git.changed") ?? null;
       const poke = changed !== this.changed;
       this.changed = changed;
-      this.look(cx, poke || Date.now() - this.at >= 5000);
+      this.look(cx, poke || Date.now() - this.at >= 10000);
     });
   }
 

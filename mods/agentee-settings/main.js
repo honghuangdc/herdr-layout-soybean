@@ -22,10 +22,10 @@ import { check, result as installResult, startInstall } from "./updates.js";
 // The shared contract (see the theme brief). These three groups and their
 // values are fixed; the panels read them and fall back to the same numbers.
 const CONTRACT_DEFAULTS = {
-  agents: { enabled: true, interval: 15, showTokens: true, showHistory: true },
+  agents: { enabled: true, interval: 60, showTokens: true, showHistory: true },
   system: {
     enabled: true,
-    interval: 2,
+    interval: 10,
     showCpu: true,
     showGpu: true,
     showRam: true,
@@ -33,7 +33,7 @@ const CONTRACT_DEFAULTS = {
     showNetwork: true,
     showTemp: true,
   },
-  git: { refresh: 5 },
+  git: { refresh: 30 },
 };
 
 // Groups the contract leaves to the layout owner, plus the git panel's two

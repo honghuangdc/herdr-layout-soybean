@@ -10,7 +10,7 @@ import { View, div } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { agents, terminals, panes, spaces, theme, exec, appHome, home, shared, window } from "herdr";
 
-const DEFAULTS = { enabled: true, interval: 15, showTokens: true, showHistory: true };
+const DEFAULTS = { enabled: true, interval: 60, showTokens: true, showHistory: true };
 const MIN_INTERVAL = 2;
 const SCRIPT = "mods/agentee-agents/tokens.mjs";
 const CACHE = "data/agentee-agents/tokens-cache.json";
