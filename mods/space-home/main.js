@@ -8,9 +8,12 @@
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { run, exec, theme, spaces, settings } from "herdr";
+import { run, exec, theme, spaces, settings, focused } from "herdr";
 
 const MONO = () => settings()?.font_family ?? "JetBrains Mono";
+// The collector ships next to this file; it reads pi, codex and claude's own session stores.
+const SESSIONS = 'python3 "$HOME/.config/herdr-app/mods/space-home/sessions.py" "$1"';
+const AGENT_COLOR = (t) => ({ pi: t.accent, codex: t.done, claude: t.unknown });
 
 export default class SpaceHome extends View {
   init(p, cx) {
@@ -22,7 +25,8 @@ export default class SpaceHome extends View {
 
   space() {
     const all = spaces() ?? [];
-    return (this.spaceId && all.find((s) => s.id === this.spaceId)) || all.find((s) => s.active) || null;
+    const id = this.spaceId ?? focused()?.space;
+    return (id && all.find((s) => s.id === id)) || all.find((s) => s.active) || null;
   }
 
   load(cx) {
@@ -47,6 +51,7 @@ export default class SpaceHome extends View {
       const log = branch ? await sh("git", ["log", "-6", "--pretty=format:%h%x1f%cr%x1f%s"]) : null;
       const counts = branch ? await sh("git", ["rev-list", "--left-right", "--count", "HEAD...@{upstream}"]) : null;
       const files = branch ? null : await sh("ls", ["-1", cwd]);
+      const sessions = await sh("sh", ["-c", SESSIONS, "sh", cwd]);
       const [ahead, behind] = counts ? counts.split(/\s+/).map(Number) : [];
       this.data = {
         kind: branch ? "repo" : files === null ? "none" : "folder",
@@ -57,6 +62,7 @@ export default class SpaceHome extends View {
         behind: behind || 0,
         commits: (log ?? "").split("\n").filter(Boolean).map((l) => l.split("\x1f")),
         entries: (files ?? "").split("\n").filter(Boolean).slice(0, 14),
+        sessions: (() => { try { return JSON.parse(sessions) ?? []; } catch { return []; } })(),
       };
       cx.notify();
     });
@@ -76,6 +82,14 @@ export default class SpaceHome extends View {
     return h_flex().h(20).flex_none().gap(5).px(8).items_center().rounded(6).text_size(11)
       .bg(t.surface).border_1().border_color(t.border).text_color(color ?? t.muted)
       .child(text);
+  }
+
+  // "3m", "5h", "2d" — the shape git's own %cr uses.
+  ago(ms) {
+    const min = Math.max(0, Math.round((Date.now() - ms) / 60000));
+    if (min < 60) return `${min}m`;
+    if (min < 1440) return `${Math.round(min / 60)}h`;
+    return `${Math.round(min / 1440)}d`;
   }
 
   render() {
@@ -120,6 +134,14 @@ export default class SpaceHome extends View {
               .child(div().font_family(MONO()).text_color(t.muted).truncate().child(name)))))))
 
         .when(d.kind === "none", (el) => el.child(div().text_size(12).text_color(t.muted).child("No folder for this space.")))
+
+        .when((d.sessions ?? []).length > 0, (el) => el.child(section("Agent sessions", v_flex().gap(1)
+          .children(d.sessions.map((x) => h_flex().w_full().h(26).px(6).gap(10).items_center().rounded(4)
+            .text_size(12).whitespace_nowrap().hover((y) => y.bg(t.hover))
+            .child(div().flex_none().w(46).text_size(10).font_semibold()
+              .text_color(AGENT_COLOR(t)[x.agent] ?? t.muted).child(x.agent))
+            .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(x.title))
+            .child(div().flex_none().text_color(t.dim).text_size(11).child(this.ago(x.ms))))))))
 
         .child(section("Start", h_flex().gap(8).flex_wrap()
           .child(this.action(t, "home-terminal", "Terminal", "terminal", () => run("tab.new", {})))
