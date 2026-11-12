@@ -36,7 +36,7 @@ A dark, editor-shaped Herdr window: a fixed 256px spaces-and-agents sidebar, a C
 
 ## Patched upstream mods
 
-- `github` ← [alarboulletmarin/herdr-github](https://github.com/alarboulletmarin/herdr-github) `mods/github`. Local patch: 30px header and `rounded(8)` shell so it sits flush with the Files panel (`// soybean:` comment in `main.js`). Needs the `gh` CLI; Milestones and Projects need `read:project`.
+- `github` ← [alarboulletmarin/herdr-github](https://github.com/alarboulletmarin/herdr-github) `mods/github`. Local patches (`// soybean:` comments in `main.js`): a 30px header and `rounded(8)` shell so it sits flush with the Files panel, and a panel whose repository follows the folder of the selected space instead of the focused terminal's cwd — a space without a local folder (studio/remote) clears the previous repository instead of showing it. Needs the `gh` CLI; Milestones and Projects need `read:project`.
 - `git-graph-vsc` ← [pipisasa/herdr-git-graph](https://github.com/pipisasa/herdr-git-graph). Renamed from `git-graph` (folder, every `"mod"` value and every `mods/git-graph/...` path in its JS), and the pencil next to a diff header opens the file in `agentee-editor` — an existing editor pane in the same tab if there is one, otherwise a new right split.
 - `file-icons` is derived from Herdr's shipped `files` mod (Apache-2.0).
 

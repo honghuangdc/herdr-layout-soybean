@@ -45,8 +45,10 @@ function hidden() {
 function location(last) {
   const space = spaces().find((s) => s.active), f = focused();
   const pane = f?.pane ? panes().find((p) => p.pane === f.pane) : null;
-  if (pane && !pane.terminal && last) return last;
-  return { cwd: pane?.cwd || f?.cwd || space?.folder, on: space?.machine ?? null, space: f?.space ?? space?.id };
+  // soybean: the selected space is the truth, not the focused pane. Its folder decides
+  // the repository, its id keys the remembered repo, and focusing the panel itself no
+  // longer falls back to another space's last location.
+  return { cwd: space?.folder || pane?.cwd || f?.cwd, on: space?.machine ?? null, space: space?.id ?? f?.space };
 }
 
 // In progress / In review on a row: why, in the stage's color (work.js).
