@@ -47,6 +47,37 @@ export function tone(t, status) {
   return t[status] ?? t.unknown;
 }
 
+// A new space opens on its home page, not on the bare shell the app starts with:
+// a space that did not exist at the last look, newly active here, has that shell
+// swapped for the `space-home` tab (see `openHome`).
+function newSpace(machine) {
+  run("space.new", { machine: machine ?? "" });
+}
+
+// A new space opens on its home page, not on the bare shell the app starts with.
+// The ids seen so far live in shared state: this mod is reloaded freely around a
+// space switch, so a module variable would forget them and every space would look
+// new. Another machine's app gives its own spaces a home; this one skips them.
+function openHome() {
+  const now = spaces() ?? [];
+  const ids = now.map((s) => s.id);
+  const seen = shared("space.home.seen");
+  if (!Array.isArray(seen)) {
+    setShared("space.home.seen", ids);
+    return;
+  }
+  if (ids.length !== seen.length || ids.some((id) => !seen.includes(id))) setShared("space.home.seen", ids);
+  for (const s of now) {
+    if (seen.includes(s.id) || s.machine || !s.active) continue;
+    // The app starts a space with one tab, a shell; TabInfo counts panes, so the
+    // count is the whole test.
+    const [shell] = s.tabs ?? [];
+    if (!shell || (s.tabs ?? []).length !== 1) continue;
+    run("tab.new", { mod: "space-home", name: "Home", props: { space: s.id } });
+    run("tab.close", { id: shell.id });
+  }
+}
+
 export default class Spaces extends View {
   init(_props, cx) {
     this.git = {}; // where() -> { name, branch, ahead, behind, repo, linked }, null: not a repo
@@ -72,6 +103,7 @@ export default class Spaces extends View {
     // `git status` walks the whole tree, on another machine a process there:
     // only when its answer could have changed (see `due`).
     cx.timer.every(250, (cx) => this.checkNew(cx));
+    cx.timer.every(250, () => openHome());
   }
 
   checkNew(cx) {
@@ -342,12 +374,12 @@ export default class Spaces extends View {
               .on_click((_e, cx) => { cx.stop_propagation(); this.reconnect(machine, cx); })
               .child(repair?.busy ? "Connecting…" : "Connect"))))
           .when(connected, el => el.child(div().id(`machine-add-${m ?? "local"}`).flex_none().px(4).rounded(4).hover(s => s.bg(t.hover).text_color(t.foreground))
-            .on_click((_e, cx) => { cx.stop_propagation(); run("space.new", { machine: m ?? "" }); }).child("+")))
+            .on_click((_e, cx) => { cx.stop_propagation(); newSpace(m); }).child("+")))
           .child(div().size(6).rounded(3).flex_none().bg(connected ? t.ansi2 : t.dim))
           .child(svg(`mods/workspace-chrome/chevron-${folded ? "right" : "down"}.svg`).size(11).flex_none()));
       const empty = h_flex().id(`machine-new-${m ?? "local"}`).h(28).flex_none().px(8).gap(7).items_center().rounded(7)
         .text_size(12).text_color(t.dim).hover(s => s.bg(t.hover).text_color(t.foreground))
-        .on_click(() => run("space.new", { machine: m ?? "" }))
+        .on_click(() => newSpace(m))
         .child(svg("mods/workspace-chrome/plus.svg").size(12)).when(!collapsed, el => el.child("New space there"));
       if (!collapsed && rebuilt) return [head];
       // A connected machine with no spaces keeps its status header but does not
@@ -491,7 +523,7 @@ export default class Spaces extends View {
         .when(!collapsed, el => el.child(div().font_semibold().child("SPACES")))
         .child(div().id("space-new").size(22).flex_none().flex().items_center().justify_center().rounded(5)
           .text_size(15).text_color(t.dim).hover(s => s.bg(t.hover).text_color(t.accent))
-          .tooltip("New space").on_click(() => run("space.new")).child("+")))
+          .tooltip("New space").on_click(() => newSpace(null)).child("+")))
       .child(v_flex().flex_1().min_h(0).px(6).pb(10).gap(1).overflow_y_scrollbar().mode("always")
         .on_mouse_up("left", (_e, cx) => { this.pressed = null; cx.notify(); })
         .children(this.grouped(t, collapsed)));

@@ -25,6 +25,7 @@ function ensureSpace() {
 
 // Panes run by a mod carry no program; give the ones we ship a tile by hand.
 const MOD_TILES = {
+  "space-home": { name: "Home", icon: "mods/space-home/home.svg", tint: true, tile: "#22323a", color: "#9ec8d8" },
   "git-graph-vsc": { name: "Git Graph", icon: "mods/git-graph-vsc/graph.svg", tint: true, tile: "#2d2a3a", color: "#c9a7f5" },
 };
 
