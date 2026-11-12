@@ -7,8 +7,8 @@
 // closes the terminal the app opened with the space.
 
 import { View, div, svg } from "gpui-kit";
-import { v_flex, h_flex } from "gpui-base";
-import { run, exec, theme, spaces, settings, focused } from "herdr";
+import { v_flex, h_flex, InputState, Input } from "gpui-base";
+import { run, exec, theme, spaces, settings, focused, shared, setShared } from "herdr";
 
 const MONO = () => settings()?.font_family ?? "JetBrains Mono";
 // The collector ships next to this file; it reads pi, codex and claude's own session stores.
@@ -21,6 +21,13 @@ export default class SpaceHome extends View {
   init(p, cx) {
     this.spaceId = p?.space ?? null;
     this.data = { kind: "loading" };
+    this.editing = false;
+    this.draft = "";
+    this.error = null;
+    this.handle = cx.focus_handle();
+    this.input = InputState.new({ value: "" });
+    this.input.on("change", (_e, cx) => { this.draft = this.input.value(); cx.notify(); });
+    this.input.on("submit", () => this.move());
     this.load(cx);
     cx.timer.every(15000, (cx) => this.load(cx));
   }
@@ -86,6 +93,66 @@ export default class SpaceHome extends View {
       .child(text);
   }
 
+  // Retarget the space by typing a folder. The new folder arrives as a new space
+  // (`agentee-spaces` does the swap), because no command repoints a space.
+  editFolder(cx) {
+    this.editing = true;
+    this.error = null;
+    this.draft = this.space()?.folder ?? "";
+    this.input.set_value(this.draft);
+    cx.timer.after(30, () => this.input.focus());
+    cx.notify();
+  }
+
+  cancelEdit(cx) {
+    this.editing = false;
+    this.error = null;
+    cx.notify();
+  }
+
+  move() {
+    const s = this.space();
+    const raw = (this.draft ?? "").trim();
+    if (!s || !raw) return this.cancelEdit();
+    const on = s.machine ?? null;
+    exec("sh", ["-c", 'cd "$1" 2>/dev/null && pwd -P', "sh", raw], { cwd: this.data.cwd ?? undefined, on }).then((r) => {
+      const abs = r.code === 0 ? r.stdout.trim() : "";
+      if (!abs) {
+        this.error = "no such folder";
+        this.editing = true;
+        return;
+      }
+      setShared("space.home.move", { id: s.id, folder: abs, at: Date.now() });
+      this.editing = false;
+      this.error = null;
+    });
+  }
+
+  key(e, cx) {
+    if (this.editing && e.key === "escape") { this.cancelEdit(cx); cx.stop_propagation(); }
+  }
+
+  folderRow(t) {
+    const s = this.space();
+    if (this.editing) {
+      return h_flex().flex_1().min_w(0).gap(8).items_center()
+        .child(Input.new(this.input).h(24).px(8).rounded(6).border_1().border_color(t.accent)
+          .bg(t.background).text_size(11).text_color(t.foreground).flex_1().min_w(0))
+        .child(div().flex_none().text_size(10).text_color(this.error ? t.blocked : t.dim)
+          .child(this.error ?? "enter to move · esc to cancel"));
+    }
+    const want = shared("space.home.move");
+    const pending = want?.id && want.id === s?.id;
+    return h_flex().flex_1().min_w(0).gap(8).items_center().justify_end()
+      .child(div().font_family(MONO()).text_size(11).text_color(t.dim).truncate()
+        .child(pending ? `${this.data.cwd ?? ""} → ${want.folder}` : (this.data.cwd ?? "")))
+      .child(h_flex().flex_none().h(20).px(7).items_center().rounded(6).text_size(10)
+        .text_color(t.muted).border_1().border_color(t.border)
+        .hover((x) => x.bg(t.raised).text_color(t.foreground))
+        .on_click((_e, cx) => { cx.stop_propagation(); this.editFolder(cx); })
+        .child("Change"));
+  }
+
   // Open the conversation in its own agent, in the space it belongs to.
   resume(x) {
     const s = this.space();
@@ -121,8 +188,7 @@ export default class SpaceHome extends View {
           .child(div().text_size(15).font_semibold().text_color(t.foreground).child(s?.name || "Space"))
           .when(d.kind === "repo", (el) => el.child(this.pill(t, d.branch)
             .child(svg("mods/space-home/branch.svg").size(10).flex_none().text_color(t.dim))))
-          .child(div().flex_1().min_w(0))
-          .child(div().font_family(MONO()).text_size(11).text_color(t.dim).truncate().child(d.cwd ?? "")))
+          .child(this.folderRow(t)))
 
         .when(d.kind === "repo", (el) => el
           .child(section("Working tree", h_flex().gap(6).flex_wrap()

@@ -76,6 +76,28 @@ function newSpace(machine) {
 // space the app just made gets its starter shell swapped for the home tab.
 // The ids seen and served so far live in shared state: this mod reloads freely
 // around a space switch, so a module variable would forget them.
+// A home page asks for another folder through shared("space.home.move"). No command
+// repoints a space, so the folder arrives with a new space; the old one is closed
+// once the new one exists and holds nothing but its home page.
+function moveSpace() {
+  const intent = shared("space.home.move");
+  if (!intent?.id || !intent?.folder) return;
+  const now = spaces() ?? [];
+  const from = now.find((s) => s.id === intent.id);
+  if (!from || from.machine) return setShared("space.home.move", null);
+  if (!intent.made) {
+    setShared("space.home.move", { ...intent, made: true, at: Date.now(), ids: now.map((s) => s.id) });
+    run("space.new", { name: base(intent.folder), folder: intent.folder });
+    return;
+  }
+  const fresh = now.find((s) => !s.machine && s.folder === intent.folder && !(intent.ids ?? []).includes(s.id));
+  const stale = Date.now() - (intent.at ?? 0) > 6000;
+  if (!fresh && !stale) return;
+  setShared("space.home.move", null);
+  // Closing a space ends its terminals, so only an otherwise empty space moves.
+  if (fresh && (from.tabs ?? []).length <= 1) run("space.close", { id: from.id, confirmed: true });
+}
+
 function openHome() {
   const now = spaces() ?? [];
   const ids = now.map((s) => s.id);
@@ -128,7 +150,7 @@ export default class Spaces extends View {
     // `git status` walks the whole tree, on another machine a process there:
     // only when its answer could have changed (see `due`).
     cx.timer.every(250, (cx) => this.checkNew(cx));
-    cx.timer.every(250, () => { uniqueNames(); openHome(); });
+    cx.timer.every(250, () => { uniqueNames(); moveSpace(); openHome(); });
   }
 
   checkNew(cx) {
