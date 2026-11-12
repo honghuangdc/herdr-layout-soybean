@@ -64,11 +64,18 @@ export default class SpaceHome extends View {
 
   action(t, id, label, icon, fn) {
     return h_flex().id(id).h(26).flex_none().gap(6).px(9).items_center().rounded(6).text_size(12)
-      .bg(t.raised).border_1().border_color(t.border).text_color(t.foreground)
-      .hover((s) => s.bg(t.hover).border_color(t.accent))
+      .border_1().border_color(t.border).text_color(t.muted)
+      .hover((s) => s.bg(t.raised).border_color(t.border_strong ?? t.border).text_color(t.foreground))
       .on_click(fn)
-      .child(svg(`mods/space-home/${icon}.svg`).size(13).flex_none().text_color(t.muted))
+      .child(svg(`mods/space-home/${icon}.svg`).size(13).flex_none())
       .child(label);
+  }
+
+  // A small rounded chip, the shape the panels use for counts and refs.
+  pill(t, text, color) {
+    return h_flex().h(20).flex_none().gap(5).px(8).items_center().rounded(6).text_size(11)
+      .bg(t.surface).border_1().border_color(t.border).text_color(color ?? t.muted)
+      .child(text);
   }
 
   render() {
@@ -80,49 +87,45 @@ export default class SpaceHome extends View {
       run("layout.select", { stack: "panel-body", child });
     };
     const label = (text) => div().text_size(10).text_color(t.dim).font_semibold().child(text.toUpperCase());
+    const section = (title, body) => v_flex().gap(7).child(label(title)).child(body);
 
-    return v_flex().size_full().min_h(0).items_center().overflow_y_scrollbar().p(34).gap(20)
-      .child(v_flex().w_full().max_w(680).gap(18)
-        .child(v_flex().gap(6)
-          .child(h_flex().gap(10).items_center()
-            .child(div().text_size(20).font_semibold().text_color(t.foreground).child(s?.name || "Space"))
-            .when(d.kind === "repo", (el) => el.child(h_flex().h(20).gap(4).px(7).items_center().rounded(10)
-              .bg(t.raised).text_size(11).text_color(t.muted)
-              .child(svg("mods/space-home/branch.svg").size(10).flex_none())
-              .child(d.branch))))
-          .child(div().font_family(MONO()).text_size(12).text_color(t.muted).truncate().child(d.cwd ?? "")))
+    return v_flex().id("space-home").size_full().min_h(0).bg(t.background)
+      .child(v_flex().flex_1().min_h(0).overflow_y_scrollbar().p(16).gap(20).max_w(780).w_full()
+
+        .child(h_flex().gap(9).items_center()
+          .child(svg("mods/space-home/home.svg").size(14).flex_none().text_color(t.dim))
+          .child(div().text_size(15).font_semibold().text_color(t.foreground).child(s?.name || "Space"))
+          .when(d.kind === "repo", (el) => el.child(this.pill(t, d.branch)
+            .child(svg("mods/space-home/branch.svg").size(10).flex_none().text_color(t.dim))))
+          .child(div().flex_1().min_w(0))
+          .child(div().font_family(MONO()).text_size(11).text_color(t.dim).truncate().child(d.cwd ?? "")))
 
         .when(d.kind === "repo", (el) => el
-          .child(v_flex().gap(6)
-            .child(label("Working tree"))
-            .child(h_flex().gap(14).items_center().text_size(12)
-              .child(div().text_color(d.dirty ? t.blocked : t.done).child(d.dirty ? `${d.dirty} uncommitted` : "clean"))
-              .when(d.ahead > 0, (x) => x.child(div().text_color(t.muted).child(`${d.ahead} ahead`)))
-              .when(d.behind > 0, (x) => x.child(div().text_color(t.muted).child(`${d.behind} behind`)))))
-          .child(v_flex().gap(3)
-            .child(label("Recent commits"))
-            .children(d.commits.map(([sha, when, subject]) => h_flex().gap(10).items_center().text_size(12).py(2).whitespace_nowrap()
+          .child(section("Working tree", h_flex().gap(6).flex_wrap()
+            .child(this.pill(t, d.dirty ? `${d.dirty} uncommitted` : "clean", d.dirty ? t.blocked : t.done))
+            .when(d.ahead > 0, (x) => x.child(this.pill(t, `${d.ahead} ahead`)))
+            .when(d.behind > 0, (x) => x.child(this.pill(t, `${d.behind} behind`)))))
+          .child(section("Recent commits", v_flex().gap(1)
+            .children(d.commits.map(([sha, when, subject]) => h_flex().w_full().h(26).px(6).gap(10).items_center().rounded(4)
+              .text_size(12).whitespace_nowrap().hover((x) => x.bg(t.hover))
               .child(div().font_family(MONO()).text_size(11).text_color(t.dim).flex_none().w(56).child(sha))
               .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(subject))
-              .child(div().flex_none().text_color(t.dim).text_size(11).child(when))))))
+              .child(div().flex_none().text_color(t.dim).text_size(11).child(when))))
+            .when(d.commits.length === 0, (x) => x.child(div().text_size(12).text_color(t.muted).child("No commits yet."))))))
 
         .when(d.kind === "folder", (el) => el
-          .child(v_flex().gap(6)
-            .child(label("Not a git repository"))
-            .child(v_flex().gap(2).children(d.entries.map((name) =>
-              h_flex().gap(8).items_center().text_size(12)
-                .child(svg("mods/space-home/file.svg").size(11).flex_none().text_color(t.dim))
-                .child(div().font_family(MONO()).text_color(t.muted).child(name)))))))
+          .child(section("Not a git repository", v_flex().gap(1).children(d.entries.map((name) =>
+            h_flex().w_full().h(24).px(6).gap(8).items_center().rounded(4).text_size(12).hover((x) => x.bg(t.hover))
+              .child(svg("mods/space-home/file.svg").size(11).flex_none().text_color(t.dim))
+              .child(div().font_family(MONO()).text_color(t.muted).truncate().child(name)))))))
 
         .when(d.kind === "none", (el) => el.child(div().text_size(12).text_color(t.muted).child("No folder for this space.")))
 
-        .child(v_flex().gap(6)
-          .child(label("Start"))
-          .child(h_flex().gap(8).flex_wrap()
-            .child(this.action(t, "home-terminal", "Terminal", "terminal", () => run("tab.new", {})))
-            .child(this.action(t, "home-files", "Files", "files", () => panel("panel-files")))
-            .child(this.action(t, "home-github", "GitHub", "github", () => panel("panel-gh")))
-            .child(this.action(t, "home-graph", "Git graph", "graph",
-              () => run("tab.new", { mod: "git-graph-vsc", name: "Git Graph", props: { tab: true } }))))));
+        .child(section("Start", h_flex().gap(8).flex_wrap()
+          .child(this.action(t, "home-terminal", "Terminal", "terminal", () => run("tab.new", {})))
+          .child(this.action(t, "home-files", "Files", "files", () => panel("panel-files")))
+          .child(this.action(t, "home-github", "GitHub", "github", () => panel("panel-gh")))
+          .child(this.action(t, "home-graph", "Git Graph", "graph",
+            () => run("tab.new", { mod: "git-graph-vsc", name: "Git Graph", props: { tab: true } }))))));
   }
 }
