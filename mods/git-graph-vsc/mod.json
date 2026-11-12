@@ -1,0 +1,10 @@
+{
+  "place": "none",
+  "title": "Git Graph (VS Code)",
+  "focusable": true,
+  "overlay": {
+    "kind": "dialog",
+    "width": 0.94,
+    "height": 0.9
+  }
+}

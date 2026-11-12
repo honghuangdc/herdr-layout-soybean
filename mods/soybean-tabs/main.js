@@ -23,8 +23,16 @@ function ensureSpace() {
   if (!spaces().some((s) => s.active)) run("space.new");
 }
 
+// Panes run by a mod carry no program; give the ones we ship a tile by hand.
+const MOD_TILES = {
+  "git-graph-vsc": { name: "Git Graph", icon: "mods/git-graph-vsc/graph.svg", tint: true, tile: "#2d2a3a", color: "#c9a7f5" },
+};
+
 export default class Tabs extends View {
-  init(_props, cx) {
+  init(props, cx) {
+    // Command behind the globe button; the layout passes its machine-local path.
+    this.browser = props?.browser ?? "herdr-browser-split";
+
     this.pressed = null;
     this.hovered = null;
     this.space = undefined;
@@ -96,7 +104,8 @@ export default class Tabs extends View {
     const item = (tab, i) => {
       const on = tab.active, hot = this.hovered === tab.id;
       const label = this.nameOf(tab) || "Tab";
-      const program = panes().find(p => p.tab === tab.id && p.program?.agent)?.program ?? panes().find(p => p.tab === tab.id)?.program;
+      const program = panes().find(p => p.tab === tab.id && p.program?.agent)?.program ?? panes().find(p => p.tab === tab.id)?.program
+        ?? MOD_TILES[panes().find(p => p.tab === tab.id && p.mod)?.mod]; // mod panes carry no program
       // Terminals' pill: a rounded chip on a rounded tray, no accent line or dividers.
       return h_flex().id(`tab-${tab.id}`).h(26).flex_none().max_w(maxW).min_w(minW)
         .pl(5).pr(5).gap(7).items_center()
@@ -157,23 +166,6 @@ export default class Tabs extends View {
         run("layout.select", { stack: "panel-body", child: id });
       })
       .child(svg(`mods/soybean-tabs/icons/${icon}.svg`).size(15));
-    const f = focused();
-    // The status bar resolves the open editor file's project root; use the same
-    // root for the overlay, so Git opens the repository Files shows.
-    const g = shared("agentee.git.status");
-    const pane = f?.pane ? panes().find((p) => p.pane === f.pane) : null;
-    const projectRoot = (pane?.mod === "agentee-editor" ? g?.cwd : null) ?? f?.cwd ?? spaces().find((s) => s.active)?.folder ?? home();
-    // What the status bar's git read says is waiting here: a dot on the Git
-    // button (conflicts or something to pull: red, changes: amber, to push: green).
-    const waiting = g ? [
-      g.conflicted > 0 ? `${g.conflicted} conflict${g.conflicted === 1 ? "" : "s"}` : null,
-      g.changes > 0 ? `${g.changes} change${g.changes === 1 ? "" : "s"} to commit` : null,
-      g.ahead > 0 ? `${g.ahead} commit${g.ahead === 1 ? "" : "s"} to push` : null,
-      g.behind > 0 ? `${g.behind} commit${g.behind === 1 ? "" : "s"} to pull` : null,
-    ].filter(Boolean) : [];
-    const gitDot = !g ? null : g.conflicted > 0 || g.behind > 0 ? t.blocked : g.changes > 0 ? t.ansi3 : g.ahead > 0 ? t.done : null;
-    const gitTip = g ? `Git · ${g.branch ?? "detached"}${waiting.length ? `\n${waiting.join(" · ")}` : " · nothing to commit, push or pull"}` : "Git branches";
-    // The git button toggles the git-graph block (panel-graph) in the right stack.
     const lightsPadding = w?.platform === "macos" && w.titlebar === "none" && !w.fullscreen && root?.traffic_lights
       ? Math.max(10, (root.traffic_lights[0] + 64) / (settings().zoom ?? 1) - (sidebar?.hidden ? 0 : sidebar?.size?.px ?? 0))
       : 10;
@@ -184,15 +176,13 @@ export default class Tabs extends View {
         .children([...shown.map(item), plus]))
       .child(h_flex().h(31).flex_none().items_center().gap(1)
         .child(panelButton("panel-files", "folder", "Files"))
-        .child(panelButton("panel-routing", "route", "Routing"))
-        .child(panelButton("panel-agents", "bot", "Agents"))
-        .child(panelButton("panel-system", "cpu", "System"))
-        .child(panelButton("panel-github", "github", "GitHub"))
-        .child(panelButton("panel-graph", "branch", gitTip).relative()
-          .when(Boolean(gitDot), (el) => el.child(div().absolute().top(3).right(3).size(7).rounded_full().bg(gitDot).border_1().border_color(t.chrome)))))
+        .child(panelButton("panel-gh", "github", "GitHub"))
+        .child(button("add-phone", svg("mods/soybean-tabs/icons/smartphone.svg").size(15), () => run("mod.open", { name: "add-phone" }), "Add phone"))
+        .child(button("open-browser", svg("mods/soybean-tabs/icons/globe.svg").size(15), () => run("pane.split", { direction: "right", argv: [this.browser] }), "Browser in a new pane"))
+        .child(button("new-graph-tab", svg("mods/soybean-tabs/icons/graph.svg").size(15), () => run("tab.new", { mod: "git-graph-vsc", name: "Git Graph", props: { tab: true } }), "Git Graph in a new tab"))
       .when(w?.buttons, el => el.child(h_flex().h(31).items_center().gap(2)
         .child(button("minimize", w.platform === "windows" ? svg("mods/soybean-tabs/icons/win-min.svg").size(15) : "−", () => run("window.minimize")))
         .child(button("maximize", w.platform === "windows" ? svg(`mods/soybean-tabs/icons/${w.maximized ? "win-restore" : "win-max"}.svg`).size(15) : "□", () => run("window.maximize")))
-        .child(button("close-window", svg("mods/soybean-tabs/icons/win-close.svg").size(15), () => run("window.close")))));
+        .child(button("close-window", svg("mods/soybean-tabs/icons/win-close.svg").size(15), () => run("window.close"))))));
   }
 }

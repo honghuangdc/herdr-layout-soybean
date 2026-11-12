@@ -69,7 +69,10 @@
           "id": "tabs",
           "type": "block",
           "content": {
-            "mod": "soybean-tabs"
+            "mod": "soybean-tabs",
+            "props": {
+              "browser": "/Users/soybean/.local/bin/herdr-browser-split"
+            }
           },
           "size": {
             "px": 38
@@ -125,38 +128,10 @@
                       }
                     },
                     {
-                      "id": "panel-routing",
+                      "id": "panel-gh",
                       "type": "block",
                       "content": {
-                        "mod": "magpie-routing"
-                      }
-                    },
-                    {
-                      "id": "panel-agents",
-                      "type": "block",
-                      "content": {
-                        "mod": "agentee-agents"
-                      }
-                    },
-                    {
-                      "id": "panel-system",
-                      "type": "block",
-                      "content": {
-                        "mod": "agentee-system"
-                      }
-                    },
-                    {
-                      "id": "panel-graph",
-                      "type": "block",
-                      "content": {
-                        "mod": "git-graph"
-                      }
-                    },
-                    {
-                      "id": "panel-github",
-                      "type": "block",
-                      "content": {
-                        "mod": "mission-control-github"
+                        "mod": "github"
                       }
                     }
                   ],
