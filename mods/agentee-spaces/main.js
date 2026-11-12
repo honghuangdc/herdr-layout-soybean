@@ -83,15 +83,24 @@ function openHome() {
   const before = Array.isArray(seen) ? seen : null;
   const made = (shared("space.home.made") ?? []).filter((id) => ids.includes(id));
   if (!before || before.length !== ids.length || ids.some((id) => !before.includes(id))) setShared("space.home.seen", ids);
-  const active = now.find((s) => s.active);
-  if (!active || active.machine || made.includes(active.id)) return;
   const homes = new Set(panes().filter((p) => p.mod === "space-home").map((p) => p.tab));
-  const tabs = active.tabs ?? [];
-  if (tabs.some((t) => homes.has(t.id))) return;
-  setShared("space.home.made", [...made, active.id]);
-  run("tab.new", { space: active.id, mod: "space-home", name: "Home", props: { space: active.id } });
-  // A space the app just started has one tab, a shell; the home tab takes its place.
-  if (before && !before.includes(active.id) && tabs.length === 1) run("tab.close", { id: tabs[0].id });
+  for (const s of now) {
+    if (s.machine) continue;
+    const tabs = s.tabs ?? [];
+    const home = tabs.find((t) => homes.has(t.id));
+    // The home tab sits first; the strip will not drag it out of place.
+    if (home) {
+      if (tabs[0].id !== home.id) run("tab.move", { id: home.id, index: 1 });
+      continue;
+    }
+    // A space without one gets it while it is on screen: tab.new switches the
+    // app to the space it adds to, so a background space waits its turn.
+    if (!s.active || made.includes(s.id)) continue;
+    setShared("space.home.made", [...made, s.id]);
+    run("tab.new", { space: s.id, mod: "space-home", name: "Home", props: { space: s.id } });
+    // A space the app just started has one tab, a shell; the home tab takes its place.
+    if (before && !before.includes(s.id) && tabs.length === 1) run("tab.close", { id: tabs[0].id });
+  }
 }
 
 export default class Spaces extends View {

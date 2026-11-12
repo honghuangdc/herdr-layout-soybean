@@ -125,7 +125,7 @@ export default class Tabs extends View {
         })
         .on_mouse_down("left", (e, cx) => {
           cx.stop_propagation();
-          this.pressed = i;
+          if (!pinned) this.pressed = i; // the home tab keeps its place
           if (e.click_count === 2) run("tab.rename", { id: tab.id });
         })
         .on_mouse_up("left", () => {
