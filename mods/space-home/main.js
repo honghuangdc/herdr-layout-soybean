@@ -7,7 +7,7 @@
 // closes the terminal the app opened with the space.
 
 import { View, div, svg } from "gpui-kit";
-import { v_flex, h_flex, InputState, Input } from "gpui-base";
+import { v_flex, h_flex } from "gpui-base";
 import { run, exec, theme, spaces, settings, focused, shared, setShared } from "herdr";
 
 const MONO = () => settings()?.font_family ?? "JetBrains Mono";
@@ -21,13 +21,7 @@ export default class SpaceHome extends View {
   init(p, cx) {
     this.spaceId = p?.space ?? null;
     this.data = { kind: "loading" };
-    this.editing = false;
-    this.draft = "";
-    this.error = null;
-    this.handle = cx.focus_handle();
-    this.input = InputState.new({ value: "" });
-    this.input.on("change", (_e, cx) => { this.draft = this.input.value(); cx.notify(); });
-    this.input.on("submit", () => this.move());
+    this.picking = false;
     this.load(cx);
     cx.timer.every(15000, (cx) => this.load(cx));
   }
@@ -93,64 +87,39 @@ export default class SpaceHome extends View {
       .child(text);
   }
 
-  // Retarget the space by typing a folder. The new folder arrives as a new space
-  // (`agentee-spaces` does the swap), because no command repoints a space.
-  editFolder(cx) {
-    this.editing = true;
-    this.error = null;
-    this.draft = this.space()?.folder ?? "";
-    this.input.set_value(this.draft);
-    cx.timer.after(30, () => this.input.focus());
-    cx.notify();
-  }
-
-  cancelEdit(cx) {
-    this.editing = false;
-    this.error = null;
-    cx.notify();
-  }
-
-  move() {
+  // Retarget the space by picking a folder in the system panel. The folder arrives
+  // as a new space (`agentee-spaces` does the swap), because no command repoints one.
+  pickFolder(cx) {
     const s = this.space();
-    const raw = (this.draft ?? "").trim();
-    if (!s || !raw) return this.cancelEdit();
-    const on = s.machine ?? null;
-    exec("sh", ["-c", 'cd "$1" 2>/dev/null && pwd -P', "sh", raw], { cwd: this.data.cwd ?? undefined, on }).then((r) => {
-      const abs = r.code === 0 ? r.stdout.trim() : "";
-      if (!abs) {
-        this.error = "no such folder";
-        this.editing = true;
-        return;
-      }
-      setShared("space.home.move", { id: s.id, folder: abs, at: Date.now() });
-      this.editing = false;
-      this.error = null;
+    const at = this.data.cwd;
+    if (!s || !at || this.picking) return;
+    this.picking = true;
+    cx.notify();
+    cx.spawn(async (cx) => {
+      const quoted = at.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      const r = await exec("osascript", ["-e",
+        `POSIX path of (choose folder with prompt "Move this space here" default location POSIX file "${quoted}")`],
+        { cwd: at, on: s.machine ?? null, timeout: 600000 }).catch(() => null);
+      this.picking = false;
+      const folder = r?.code === 0 ? (r.stdout ?? "").trim().replace(/\/+$/, "") : "";
+      if (folder) setShared("space.home.move", { id: s.id, folder, at: Date.now() });
+      cx.notify();
     });
-  }
-
-  key(e, cx) {
-    if (this.editing && e.key === "escape") { this.cancelEdit(cx); cx.stop_propagation(); }
   }
 
   folderRow(t) {
     const s = this.space();
-    if (this.editing) {
-      return h_flex().flex_1().min_w(0).gap(8).items_center()
-        .child(Input.new(this.input).h(24).px(8).rounded(6).border_1().border_color(t.accent)
-          .bg(t.background).text_size(11).text_color(t.foreground).flex_1().min_w(0))
-        .child(div().flex_none().text_size(10).text_color(this.error ? t.blocked : t.dim)
-          .child(this.error ?? "enter to move · esc to cancel"));
-    }
     const want = shared("space.home.move");
-    const pending = want?.id && want.id === s?.id;
+    const moving = want?.id && want.id === s?.id;
     return h_flex().flex_1().min_w(0).gap(8).items_center().justify_end()
       .child(div().font_family(MONO()).text_size(11).text_color(t.dim).truncate()
-        .child(pending ? `${this.data.cwd ?? ""} → ${want.folder}` : (this.data.cwd ?? "")))
-      .child(h_flex().flex_none().h(20).px(7).items_center().rounded(6).text_size(10)
-        .text_color(t.muted).border_1().border_color(t.border)
-        .hover((x) => x.bg(t.raised).text_color(t.foreground))
-        .on_click((_e, cx) => { cx.stop_propagation(); this.editFolder(cx); })
-        .child("Change"));
+        .child(moving ? `${this.data.cwd ?? ""} → ${want.folder}` : (this.data.cwd ?? "")))
+      // A space on another machine keeps its folder: the panel would open there.
+      .when(!s?.machine, (el) => el.child(h_flex().flex_none().h(20).px(7).items_center().rounded(6).text_size(10)
+        .text_color(this.picking ? t.dim : t.muted).border_1().border_color(t.border)
+        .when(!this.picking, (x) => x.hover((y) => y.bg(t.raised).text_color(t.foreground))
+          .on_click((_e, cx) => { cx.stop_propagation(); this.pickFolder(cx); }))
+        .child(this.picking ? "choosing…" : "Change")));
   }
 
   // Open the conversation in its own agent, in the space it belongs to.
