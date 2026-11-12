@@ -102,8 +102,11 @@ export default class Tabs extends View {
       .bg(p?.tile ?? t.surface).flex().items_center().justify_center()
       .when(Boolean(p?.icon), el => el.child(p.tint ? svg(p.icon).size(13).flex_none().text_color(p.color ?? t.foreground) : image(p.icon).size(13).flex_none()));
 
+    // A space's home tab is furniture: no close button, no middle-click close.
+    const fixed = new Set(panes().filter(p => p.mod === "space-home").map(p => p.tab));
+
     const item = (tab, i) => {
-      const on = tab.active, hot = this.hovered === tab.id;
+      const on = tab.active, hot = this.hovered === tab.id, pinned = fixed.has(tab.id);
       const label = this.nameOf(tab) || "Tab";
       const program = panes().find(p => p.tab === tab.id && p.program?.agent)?.program ?? panes().find(p => p.tab === tab.id)?.program
         ?? MOD_TILES[panes().find(p => p.tab === tab.id && p.mod)?.mod]; // mod panes carry no program
@@ -114,7 +117,7 @@ export default class Tabs extends View {
         .when(on, el => el.bg(t.raised).border_color(t.border))
         .when(!on, el => el.border_color("#00000000").hover(s => s.bg(t.hover)))
         .text_size(12).text_color(on ? t.foreground : t.muted).cursor_pointer()
-        .on_mouse_down("middle", (_e, cx) => { cx.stop_propagation(); run("tab.close", { id: tab.id }); })
+        .when(!pinned, el => el.on_mouse_down("middle", (_e, cx) => { cx.stop_propagation(); run("tab.close", { id: tab.id }); }))
         .on_hover((hovered, cx) => {
           if (hovered) this.hovered = tab.id;
           else if (this.hovered === tab.id) this.hovered = null;
@@ -140,11 +143,14 @@ export default class Tabs extends View {
           .when(tab.status === "working", el => el.child(div().flex_none().text_size(12).text_color(t.working).child(SPIN[this.frame % SPIN.length])))
           .when(tab.status === "blocked", el => el.child(div().size(6).flex_none().rounded_full().bg(t.blocked)))
           .when(tab.status === "done", el => el.child(div().size(6).flex_none().rounded_full().bg(t.done)))
-          // The close button keeps its place, so tabs don't jump on hover.
-          .child(div().id(`close-${tab.id}`).size(16).flex_none().flex().items_center().justify_center().rounded(3)
-            .when(on || hot || ui.closeOnHover === false, el => el.text_color(t.dim).hover(s => s.bg(t.raised).text_color(t.foreground))
-              .on_mouse_down("left", stop).on_click((_e, cx) => { cx.stop_propagation(); run("tab.close", { id: tab.id }); })
-              .child(svg("mods/soybean-tabs/icons/close.svg").size(10)))));
+          // The close button keeps its place, so tabs don't jump on hover; a
+          // pinned tab leaves the same slot empty.
+          .child(pinned
+            ? div().size(16).flex_none()
+            : div().id(`close-${tab.id}`).size(16).flex_none().flex().items_center().justify_center().rounded(3)
+              .when(on || hot || ui.closeOnHover === false, el => el.text_color(t.dim).hover(s => s.bg(t.raised).text_color(t.foreground))
+                .on_mouse_down("left", stop).on_click((_e, cx) => { cx.stop_propagation(); run("tab.close", { id: tab.id }); })
+                .child(svg("mods/soybean-tabs/icons/close.svg").size(10)))));
     };
 
     const plus = div().id("tab-new").h(26).w(28).flex_none().flex().items_center().justify_center().rounded(13)

@@ -47,6 +47,21 @@ export function tone(t, status) {
   return t[status] ?? t.unknown;
 }
 
+// Names are unique on a machine: a second space holding a name already in use
+// becomes `-2`, `-3`. Only this machine's spaces can be renamed from here, so
+// another machine's app de-duplicates its own.
+function uniqueNames() {
+  const taken = new Set();
+  for (const s of spaces() ?? []) {
+    if (s.machine || !s.name) continue;
+    const base = s.name.replace(/-\d+$/, "");
+    let name = s.name;
+    for (let n = 2; taken.has(name); n++) name = `${base}-${n}`;
+    taken.add(name);
+    if (name !== s.name) run("space.rename", { id: s.id, name });
+  }
+}
+
 // A new space opens on its home page, not on the bare shell the app starts with:
 // a space that did not exist at the last look, newly active here, has that shell
 // swapped for the `space-home` tab (see `openHome`).
@@ -103,7 +118,7 @@ export default class Spaces extends View {
     // `git status` walks the whole tree, on another machine a process there:
     // only when its answer could have changed (see `due`).
     cx.timer.every(250, (cx) => this.checkNew(cx));
-    cx.timer.every(250, () => openHome());
+    cx.timer.every(250, () => { uniqueNames(); openHome(); });
   }
 
   checkNew(cx) {
