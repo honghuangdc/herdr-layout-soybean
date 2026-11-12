@@ -10,7 +10,8 @@ import { run, props, closeOverlay, openOverlay, theme, keys, terminals, spaces, 
 // Where a space is now: its first terminal's live folder, else where it was made.
 function place(s) {
   const tabs = new Set((s.tabs ?? []).map((c) => c.id));
-  return panes().find((p) => tabs.has(p.tab) && p.cwd)?.cwd || s.folder;
+  // The space names its folder; a terminal inside it does not move that.
+  return s.folder || panes().find((p) => tabs.has(p.tab) && p.cwd)?.cwd;
 }
 
 // A space's checkout: "main" (a repo's own), "linked" (a worktree), or null.

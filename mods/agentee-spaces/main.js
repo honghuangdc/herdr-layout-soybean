@@ -19,11 +19,11 @@ function find(node, id) {
 // The sidebar's rail goes by its width, not a flag: dragging its edge narrows it too.
 const narrow = () => (find(layout(), "sidebar")?.size?.px ?? Infinity) < 160;
 
-// Where a space is now: its first terminal's live folder, else where it was made.
+// Where a space is: its own folder. A terminal inside it does not move that.
 // `ps`: panes(), read once by the caller (each read copies every pane).
 function place(s, ps) {
   const tabs = new Set((s.tabs ?? []).map((c) => c.id));
-  return ps.find((p) => tabs.has(p.tab) && p.cwd)?.cwd || s.folder;
+  return s.folder || ps.find((p) => tabs.has(p.tab) && p.cwd)?.cwd;
 }
 const rowHeight = ({ tree }) => (tree ? 24 : 27);
 const where = (s, ps) => JSON.stringify([s.machine ?? null, place(s, ps)]);
