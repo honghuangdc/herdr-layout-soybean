@@ -69,28 +69,29 @@ function newSpace(machine) {
   run("space.new", { machine: machine ?? "" });
 }
 
-// A new space opens on its home page, not on the bare shell the app starts with.
-// The ids seen so far live in shared state: this mod is reloaded freely around a
-// space switch, so a module variable would forget them and every space would look
-// new. Another machine's app gives its own spaces a home; this one skips them.
+// Every local space keeps one home tab: the strip refuses to close it, so a
+// space is only closed from its own menu. The tab is added to the space on
+// screen — at startup and whenever the selection moves — because tab.new
+// switches the app to the space it adds to, and background spaces can wait. A
+// space the app just made gets its starter shell swapped for the home tab.
+// The ids seen and served so far live in shared state: this mod reloads freely
+// around a space switch, so a module variable would forget them.
 function openHome() {
   const now = spaces() ?? [];
   const ids = now.map((s) => s.id);
   const seen = shared("space.home.seen");
-  if (!Array.isArray(seen)) {
-    setShared("space.home.seen", ids);
-    return;
-  }
-  if (ids.length !== seen.length || ids.some((id) => !seen.includes(id))) setShared("space.home.seen", ids);
-  for (const s of now) {
-    if (seen.includes(s.id) || s.machine || !s.active) continue;
-    // The app starts a space with one tab, a shell; TabInfo counts panes, so the
-    // count is the whole test.
-    const [shell] = s.tabs ?? [];
-    if (!shell || (s.tabs ?? []).length !== 1) continue;
-    run("tab.new", { mod: "space-home", name: "Home", props: { space: s.id } });
-    run("tab.close", { id: shell.id });
-  }
+  const before = Array.isArray(seen) ? seen : null;
+  const made = (shared("space.home.made") ?? []).filter((id) => ids.includes(id));
+  if (!before || before.length !== ids.length || ids.some((id) => !before.includes(id))) setShared("space.home.seen", ids);
+  const active = now.find((s) => s.active);
+  if (!active || active.machine || made.includes(active.id)) return;
+  const homes = new Set(panes().filter((p) => p.mod === "space-home").map((p) => p.tab));
+  const tabs = active.tabs ?? [];
+  if (tabs.some((t) => homes.has(t.id))) return;
+  setShared("space.home.made", [...made, active.id]);
+  run("tab.new", { space: active.id, mod: "space-home", name: "Home", props: { space: active.id } });
+  // A space the app just started has one tab, a shell; the home tab takes its place.
+  if (before && !before.includes(active.id) && tabs.length === 1) run("tab.close", { id: tabs[0].id });
 }
 
 export default class Spaces extends View {
