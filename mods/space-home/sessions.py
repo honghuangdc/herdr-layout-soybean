@@ -69,7 +69,8 @@ def collect(dirp, flavor, agent):
             continue
         if now - st.st_mtime > days * 86400 or st.st_size < 200:
             continue
-        out.append({"agent": agent, "ms": int(st.st_mtime * 1000), "file": path, "id": name.split("_")[-1][:8]})
+        ident = name.rsplit("_", 1)[-1] if agent == "pi" else name
+        out.append({"agent": agent, "ms": int(st.st_mtime * 1000), "file": path, "id": ident[:-6] if ident.endswith(".jsonl") else ident})
     out.sort(key=lambda x: -x["ms"])
     for item in out[:4]:
         item["title"] = title(item["file"], flavor)
@@ -113,7 +114,13 @@ if os.path.isdir(root):
             continue
         if f'"cwd":"{cwd}"' not in head and f'"cwd": "{cwd}"' not in head:
             continue
-        found.append({"agent": "codex", "ms": item["ms"], "file": item["path"], "id": os.path.basename(item["path"])[8:16]})
+        meta = head.split("\n", 1)[0]
+        ident = ""
+        try:
+            ident = json.loads(meta).get("payload", {}).get("session_id") or ""
+        except Exception:
+            ident = os.path.basename(item["path"])[-42:-6]
+        found.append({"agent": "codex", "ms": item["ms"], "file": item["path"], "id": ident})
         if len(found) > limit * 3:
             break
 for item in found:

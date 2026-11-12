@@ -14,6 +14,8 @@ const MONO = () => settings()?.font_family ?? "JetBrains Mono";
 // The collector ships next to this file; it reads pi, codex and claude's own session stores.
 const SESSIONS = 'python3 "$HOME/.config/herdr-app/mods/space-home/sessions.py" "$1"';
 const AGENT_COLOR = (t) => ({ pi: t.accent, codex: t.done, claude: t.unknown });
+// How each CLI picks a conversation back up by id.
+const AGENT_RESUME = { pi: ["pi", "--session"], codex: ["codex", "resume"], claude: ["claude", "--resume"] };
 
 export default class SpaceHome extends View {
   init(p, cx) {
@@ -84,6 +86,14 @@ export default class SpaceHome extends View {
       .child(text);
   }
 
+  // Open the conversation in its own agent, in the space it belongs to.
+  resume(x) {
+    const s = this.space();
+    const cli = AGENT_RESUME[x.agent];
+    if (!cli || !x.id) return;
+    run("tab.new", { space: s?.id, name: x.agent, argv: [...cli, x.id] });
+  }
+
   // "3m", "5h", "2d" — the shape git's own %cr uses.
   ago(ms) {
     const min = Math.max(0, Math.round((Date.now() - ms) / 60000));
@@ -138,6 +148,7 @@ export default class SpaceHome extends View {
         .when((d.sessions ?? []).length > 0, (el) => el.child(section("Agent sessions", v_flex().gap(1)
           .children(d.sessions.map((x) => h_flex().w_full().h(26).px(6).gap(10).items_center().rounded(4)
             .text_size(12).whitespace_nowrap().hover((y) => y.bg(t.hover))
+            .on_click(() => this.resume(x))
             .child(div().flex_none().w(46).text_size(10).font_semibold()
               .text_color(AGENT_COLOR(t)[x.agent] ?? t.muted).child(x.agent))
             .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(x.title))
