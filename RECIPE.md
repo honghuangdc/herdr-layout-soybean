@@ -7,7 +7,7 @@ A dark, editor-shaped Herdr window: a fixed 256px spaces-and-agents sidebar, a C
 ## What you see
 
 - `root`: a `row` on `background: "canvas"` (#0b0b0b), `theme: "agentee"`, `font: "JetBrains Mono"` at 13, `ui_font: "Geist"`, `terminal_padding: [8,10]`, a 1px `divider` in `border` (#2b2b2b), `titlebar: "none"`, `traffic_lights: [12,16]`, `movable: true`.
-- Left `sidebar`: 256px wide (`min: 44`, `max: 420`, `resizable: false`, `background: "chrome"` #111111). A column of four blocks: `brand` 40px `workspace-chrome` (`window_drag: true`), `spaces` `agentee-spaces` (`weight: 1`, `min: 90`), `agents` `agentee-agents-list` (`weight: 1`, `min: 90`), `sidebar-footer` 40px `agentee-chrome` with `props.role: "footer"`.
+- Left `sidebar`: 256px wide (`min: 44`, `max: 420`, `resizable: false`, `background: "chrome"` #111111). A column of four blocks: `brand` 40px `workspace-chrome` (`window_drag: true`), `spaces` `agentee-spaces` (`weight: 2`, `min: 90`, 2/3), `agents` `agentee-agents-list` (`weight: 1`, `min: 90`, 1/3), `sidebar-footer` 40px `agentee-chrome` with `props.role: "footer"`.
 - Right `work`: a column, `resizable: false`. `tabs` is a 38px `soybean-tabs` strip (`window_drag: true`). `work-body` is a `row` with `padding: 6` and `gap: 6`:
   - `main`: `content: {"tab":"active","pane":{...}}`. The pane has a 30px header on top, `reveal: "always"`, drawn by `pane-chat`; `background: "background"` (#161616), 1px `border` border, 1px `#3d3d3d` focus ring, `radius: 8`, `gap: 6`, `lone: true`.
   - `panel`: 360px (`min: 260`, `max: 760`, `background: "chrome"`), a column holding `panel-body`, a `stack` whose `active` child is `panel-files`. Its two blocks are `panel-files` (`file-icons`) and `panel-gh` (`github`).
