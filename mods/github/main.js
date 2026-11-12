@@ -133,7 +133,10 @@ export default class GitHub extends View {
   // never another tab's repo remembered from earlier (a panel or file pane keeps the last terminal, see location()).
   async follow() {
     const { cwd, on, space } = this.where();
-    if (!cwd || on) return;
+    // soybean: a studio/remote space has no local folder, so drop whatever repo the
+    // previous space left behind instead of showing a foreign repository.
+    if (on) { if (this.spaceRepos[space]) { this.spaceRepos[space] = null; keep("spaces", this.spaceRepos); } return; }
+    if (!cwd) return;
     const id = JSON.stringify([cwd, on]);
     if (!(id in this.repos)) { this.repos[id] = await repoOf(cwd, on); keep("repos", this.repos); }
     const found = this.repos[id] ?? null;
