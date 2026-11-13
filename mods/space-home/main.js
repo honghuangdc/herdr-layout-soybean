@@ -8,11 +8,22 @@
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { run, exec, theme, spaces, settings, focused, shared, setShared } from "herdr";
+import { run, exec, theme, spaces, settings, shared, setShared } from "herdr";
 
 const MONO = () => settings()?.font_family ?? "JetBrains Mono";
 // The collector ships next to this file; it reads pi, codex and claude's own session stores.
-const SESSIONS = 'python3 "$HOME/.config/herdr-app/mods/space-home/sessions.py" "$1"';
+// One shell call answers both questions; two execs made the page wait twice.
+const LOAD = 'printf "%s\\n" "$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"; python3 "$HOME/.config/herdr-app/mods/space-home/sessions.py" "$1"';
+// A space switch reloads this mod, so a module Map would split across instances.
+const CACHE_KEY = "space.home.cache";
+const cacheAll = () => shared(CACHE_KEY) ?? {};
+const cacheGet = (key) => cacheAll()[key] ?? null;
+const cacheSet = (key, value) => {
+  const all = { ...cacheAll() };
+  all[key] = { ...(all[key] ?? {}), ...value, at: Date.now() };
+  setShared(CACHE_KEY, all);
+};
+const INFLIGHT = new Set();
 const AGENT_COLOR = (t) => ({ pi: t.accent, codex: t.done, claude: t.unknown });
 // How each CLI picks a conversation back up by id.
 const AGENT_RESUME = { pi: ["pi", "--session"], codex: ["codex", "resume"], claude: ["claude", "--resume"] };
@@ -20,43 +31,44 @@ const AGENT_RESUME = { pi: ["pi", "--session"], codex: ["codex", "resume"], clau
 export default class SpaceHome extends View {
   init(p, cx) {
     this.spaceId = p?.space ?? null;
-    this.data = { kind: "loading" };
     this.picking = false;
     this.load(cx);
-    cx.timer.every(15000, (cx) => this.load(cx));
+    // A space switch re-renders this pane without rebuilding it; look again there,
+    // then every 15s while the space stays on screen.
+    cx.timer.every(250, (cx) => {
+      const s = this.space();
+      const key = this.key(s);
+      const hit = key && cacheGet(key);
+      if (key && !INFLIGHT.has(key) && (!hit || Date.now() - hit.at > 15000)) this.load(cx);
+    });
   }
 
   space() {
     const all = spaces() ?? [];
-    const id = this.spaceId ?? focused()?.space;
+    const id = this.spaceId;
     return (id && all.find((s) => s.id === id)) || all.find((s) => s.active) || null;
+  }
+
+  key(s) {
+    return s?.folder ? JSON.stringify([s.machine ?? null, s.folder]) : null;
   }
 
   load(cx) {
     const s = this.space();
-    const cwd = s?.folder;
-    if (!cwd) {
-      this.data = {};
-      cx.notify();
-      return;
-    }
+    const key = this.key(s);
+    if (!key || INFLIGHT.has(key)) return;
+    const [on, cwd] = JSON.parse(key);
+    INFLIGHT.add(key);
+    cacheSet(key, {});
     cx.spawn(async (cx) => {
-      const sh = async (cmd, args) => {
-        try {
-          const r = await exec(cmd, args, { cwd, on: s.machine ?? null });
-          return r.code === 0 ? r.stdout.trim() : null;
-        } catch {
-          return null;
-        }
-      };
-      const branch = await sh("git", ["rev-parse", "--abbrev-ref", "HEAD"]);
-      const sessions = await sh("sh", ["-c", SESSIONS, "sh", cwd]);
-      this.data = {
-        cwd,
-        branch,
-        sessions: (() => { try { return JSON.parse(sessions) ?? []; } catch { return []; } })(),
-      };
-      cx.notify();
+      try {
+        const r = await exec("sh", ["-c", LOAD, "sh", cwd], { cwd, on });
+        if (r.code !== 0) return;
+        const [branch, ...lines] = r.stdout.split("\n");
+        const sessions = (() => { try { return JSON.parse(lines.join("\n").trim()) ?? []; } catch { return []; } })();
+        cacheSet(key, { branch: branch || null, sessions });
+        cx.notify();
+      } catch {} finally { INFLIGHT.delete(key); }
     });
   }
 
@@ -80,7 +92,7 @@ export default class SpaceHome extends View {
   // as a new space (`agentee-spaces` does the swap), because no command repoints one.
   pickFolder(cx) {
     const s = this.space();
-    const at = this.data.cwd;
+    const at = s?.folder;
     if (!s || !at || this.picking) return;
     this.picking = true;
     cx.notify();
@@ -102,7 +114,7 @@ export default class SpaceHome extends View {
     const moving = want?.id && want.id === s?.id;
     return h_flex().flex_1().min_w(0).gap(8).items_center().justify_end()
       .child(div().font_family(MONO()).text_size(11).text_color(t.dim).truncate()
-        .child(moving ? `${this.data.cwd ?? ""} → ${want.folder}` : (this.data.cwd ?? "")))
+        .child(moving ? `${s?.folder ?? ""} → ${want.folder}` : (s?.folder ?? "")))
       // A space on another machine keeps its folder: the panel would open there.
       .when(!s?.machine, (el) => el.child(h_flex().flex_none().h(20).px(7).items_center().rounded(6).text_size(10)
         .text_color(this.picking ? t.dim : t.muted).border_1().border_color(t.border)
@@ -140,8 +152,9 @@ export default class SpaceHome extends View {
 
   render() {
     const t = theme();
-    const d = this.data;
     const s = this.space();
+    const key = this.key(s);
+    const d = (key && cacheGet(key)) ?? {};
     const sessions = d.sessions ?? [];
     const panel = (child) => {
       run("layout.show", { id: "panel" });
@@ -162,7 +175,7 @@ export default class SpaceHome extends View {
           .child(this.folderRow(t)))
 
         .child(this.card(t, "Agent sessions", sessions.length, sessions.length
-          ? v_flex().children(sessions.map((x) => h_flex().w_full().h(28).px(8).gap(10).items_center().rounded(5)
+          ? v_flex().max_h(280).overflow_y_scrollbar().children(sessions.map((x) => h_flex().w_full().h(28).flex_none().px(8).gap(10).items_center().rounded(5)
               .text_size(12).whitespace_nowrap().hover((y) => y.bg(t.raised))
               .on_click(() => this.resume(x))
               .child(div().flex_none().w(46).text_size(10).font_semibold()
