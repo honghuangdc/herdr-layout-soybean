@@ -175,7 +175,8 @@ export default class SpaceHome extends View {
           .child(this.folderRow(t)))
 
         .child(this.card(t, "Agent sessions", sessions.length, sessions.length
-          ? v_flex().max_h(280).overflow_y_scrollbar().children(sessions.map((x) => h_flex().w_full().h(28).flex_none().px(8).gap(10).items_center().rounded(5)
+          ? v_flex().id("space-home-sessions").h(280).flex_none().overflow_y_scrollbar().mode("always")
+              .children(sessions.map((x) => h_flex().w_full().h(28).flex_none().px(8).gap(10).items_center().rounded(5)
               .text_size(12).whitespace_nowrap().hover((y) => y.bg(t.raised))
               .on_click(() => this.resume(x))
               .child(div().flex_none().w(46).text_size(10).font_semibold()

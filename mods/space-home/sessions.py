@@ -4,7 +4,7 @@ import json, os, sys, time
 
 cwd = (sys.argv[1] if len(sys.argv) > 1 else "").rstrip("/")
 home = os.path.expanduser("~")
-limit, days = 30, 30
+limit, days = 100, 30
 now = time.time()
 
 
@@ -72,9 +72,9 @@ def collect(dirp, flavor, agent):
         ident = name.rsplit("_", 1)[-1] if agent == "pi" else name
         out.append({"agent": agent, "ms": int(st.st_mtime * 1000), "file": path, "id": ident[:-6] if ident.endswith(".jsonl") else ident})
     out.sort(key=lambda x: -x["ms"])
-    for item in out[:12]:
+    for item in out[:limit]:
         item["title"] = title(item["file"], flavor)
-    return [x for x in out if x.get("title")][:10]
+    return [x for x in out if x.get("title")][:limit]
 
 
 def variants(prefix):
